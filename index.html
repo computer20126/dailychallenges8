@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狗狗人類年齡換算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 設定字體為 Inter，並確保中文顯示正常 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 50%, #E0F6FF 100%);
+            /* 水藍色漸層背景 */
+            min-height: 100vh;
+        }
+    </style>
+    <script>
+        // 狗狗年齡換算表 (基於用戶提供的原始數據)
+        // 注意：此處數據列的順序保持不變：
+        // 欄位順序: [狗狗年齡, 原始超小型犬數據, 原始小型犬數據, 原始中型犬數據, 原始大型犬數據]
+        // 但 getSizeCategory 函數將根據新的體重分類，將體重對應到這些數據列。
+        // 請確保您的數據與實際體重分類是匹配的。
+        // 原本: [年齡, ≤ 4.5kg, 4.6-9kg, 9.1-22kg, > 22kg]
+        const CONVERSION_TABLE = [
+            [1, 15, 15, 15, 12],
+            [2, 24, 24, 24, 22],
+            [3, 28, 28, 28, 31],
+            [4, 32, 32, 32, 38],
+            [5, 36, 36, 36, 45],
+            [6, 40, 42, 45, 49],
+            [7, 44, 47, 50, 56],
+            [8, 48, 51, 55, 64],
+            [9, 52, 56, 61, 71],
+            [10, 56, 60, 66, 79],
+            [11, 60, 65, 72, 86],
+            [12, 64, 69, 77, 93],
+            [13, 68, 74, 82, 100],
+            [14, 72, 78, 88, 107],
+            [15, 76, 83, 93, 114],
+            [16, 80, 87, 99, 121],
+        ];
+
+        // 顯示通知/錯誤訊息的通用函數
+        function showNotification(message, type = 'error') {
+            const notificationDiv = document.getElementById('notification');
+
+            // 移除所有舊的顏色類別
+            notificationDiv.classList.remove('bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800', 'hidden');
+
+            if (type === 'error') {
+                notificationDiv.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'info') {
+                notificationDiv.classList.add('bg-blue-100', 'text-blue-800');
+            }
+
+            notificationDiv.textContent = message;
+            notificationDiv.classList.remove('hidden');
+
+            // 訊息顯示 5 秒後自動隱藏
+            setTimeout(() => {
+                notificationDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // 根據體重 (公斤) 確定狗狗的體型分類和對應的表格欄位索引
+        // *** 此處已修正為新的體重分級標準 ***
+        function getSizeCategory(weight) {
+
+            if (weight === null || weight <= 0) {
+                showNotification("請輸入有效的體重！", 'error');
+                return null;
+            } else if (weight <= 9.0) {
+                // 超小型犬 (Tiny) - 對應原始表格中的數據欄位索引 1
+                return { name: "超小型犬 (≤ 9.0 kg)", index: 1, lifespan: { min: 10, max: 15 } };
+            } else if (weight <= 23.0) {
+                // 中型犬 (Small) - 對應原始表格中的數據欄位索引 2
+                return { name: "中型犬 (9.1 - 23.0 kg)", index: 2, lifespan: { min: 10, max: 13 } };
+            } else if (weight <= 45.0) {
+                // 大型犬 (Medium) - 對應原始表格中的數據欄位索引 3
+                return { name: "大型犬 (23.1 - 45.0 kg)", index: 3, lifespan: { min: 10, max: 12 } };
+            } else {
+                // 巨型犬 (Large) - 對應原始表格中的數據欄位索引 4
+                return { name: "巨型犬 (> 45.0 kg)", index: 4, lifespan: { min: 8, max: 10 } };
+            }
+        }
+
+        // 檢查狗狗是否超過平均壽命並生成相應提示
+        function getLifespanWarning(dogAge, sizeCategory) {
+            const { min, max } = sizeCategory.lifespan;
+            const avgLifespan = (min + max) / 2;
+
+            if (dogAge >= max) {
+                return `<div class="mt-3 p-3 bg-orange-50 border-l-4 border-orange-400 rounded-r-lg">
+                    <p class="text-orange-700 text-sm font-medium flex items-center">
+                        <span class="text-2xl mr-2">🐕‍🦺</span>
+                        您的狗狗已經是高齡犬了！${sizeCategory.name.split(' ')[0]}的平均壽命為 ${min}-${max} 年，請特別注意健康照護。
+                    </p>
+                </div>`;
+            } else if (dogAge >= avgLifespan) {
+                return `<div class="mt-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
+                    <p class="text-yellow-700 text-sm font-medium flex items-center">
+                        <span class="text-2xl mr-2">🐕</span>
+                        您的狗狗已進入中老年期！${sizeCategory.name.split(' ')[0]}的平均壽命為 ${min}-${max} 年，建議定期健康檢查。
+                    </p>
+                </div>`;
+            }
+            return '';
+        }
+
+        // 計算狗狗的實際年齡 (以足歲計)
+        function calculateDogAge(birthDateString) {
+            const today = new Date();
+            const birthDate = new Date(birthDateString);
+
+            if (birthDate > today) {
+                showNotification("出生日期不能晚於今天！", 'error');
+                return null;
+            }
+
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDifference = today.getMonth() - birthDate.getMonth();
+            const dayDifference = today.getDate() - birthDate.getDate();
+
+            // 如果月份差小於 0，或者月份差等於 0 但日期差小於 0，則年齡減 1
+            if (monthDifference < 0 || (monthDifference === 0 && dayDifference < 0)) {
+                age--;
+            }
+
+            return age;
+        }
+
+        // 主要計算函數
+        function calculateHumanAge(event) {
+            event.preventDefault(); // 阻止表單提交
+
+            const birthDateInput = document.getElementById('birthDate').value;
+            const weightInput = document.getElementById('weight').value;
+            const resultDiv = document.getElementById('result');
+
+            // 清空結果和隱藏通知
+            resultDiv.innerHTML = '';
+            document.getElementById('notification').classList.add('hidden');
+
+
+            if (!birthDateInput || !weightInput) {
+                showNotification("請填寫所有欄位：出生日期和體重。", 'error');
+                return;
+            }
+
+            const dogAge = calculateDogAge(birthDateInput);
+            const weight = parseFloat(weightInput);
+            const sizeCategory = getSizeCategory(weight);
+
+            if (dogAge === null || sizeCategory === null) {
+                // 錯誤已在子函數中顯示
+                return;
+            }
+
+            // 查找換算表
+            let humanAge = null;
+            let dogAgeKey = Math.min(dogAge, 16); // 表格上限為 16 歲
+            let tableRow = CONVERSION_TABLE.find(row => row[0] === dogAgeKey);
+
+            if (tableRow) {
+                // sizeCategory.index 現在是根據新體重分類得出的索引，用於查找原始數據
+                humanAge = tableRow[sizeCategory.index];
+            } else if (dogAgeKey === 0) {
+                // 0 歲 (未滿 1 歲) 處理：假設為 0 歲人類年齡，或提供一個提醒。
+                humanAge = "未滿 1 歲，無法準確換算。";
+            } else {
+                // 理論上不會發生，因為已使用 Math.min(dogAge, 16)
+                humanAge = "無法計算。";
+            }
+
+            let ageNote = '';
+            if (dogAge > 16) {
+                // 如果狗狗超過 16 歲，使用 16 歲的數據並加上說明
+                ageNote = `<p class="text-sm text-yellow-600 mt-2">注意：您的狗狗已 ${dogAge} 歲。由於表格資料上限為 16 歲，我們使用 16 歲的換算值 (${humanAge} 歲) 作為參考。</p>`;
+            } else if (dogAge === 0 && typeof humanAge === 'string') {
+                // 處理未滿 1 歲的特別訊息
+                ageNote = `<p class="text-sm text-yellow-600 mt-2">提示：您的狗狗未滿 1 歲。表格僅提供足歲換算，實際換算請諮詢獸醫。</p>`;
+            }
+
+            // 獲取壽命警告
+            const lifespanWarning = getLifespanWarning(dogAge, sizeCategory);
+
+            // 顯示結果
+            if (humanAge !== null) {
+                const ageText = typeof humanAge === 'number' ? `${humanAge} 歲` : humanAge;
+
+                // 根據年齡添加適當的狗狗圖示
+                let dogIcon = '🐶'; // 預設年輕狗狗
+                if (dogAge >= sizeCategory.lifespan.max) {
+                    dogIcon = '🐕‍🦺'; // 高齡犬
+                } else if (dogAge >= (sizeCategory.lifespan.min + sizeCategory.lifespan.max) / 2) {
+                    dogIcon = '🐕'; // 中老年犬
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="p-6 bg-white border-2 border-blue-500 rounded-xl shadow-lg transition-all duration-300">
+                        <p class="text-xl font-semibold text-gray-600 mb-2 flex items-center">
+                            <span class="text-2xl mr-2">${dogIcon}</span>
+                            狗狗資訊總結：
+                        </p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-1">
+                            <li>實際年齡 (足歲)：<strong class="text-blue-600">${dogAge} 歲</strong></li>
+                            <li>體重分類：<strong class="text-blue-600">${sizeCategory.name} (${weight.toFixed(1)} 公斤)</strong></li>
+                            <li>平均壽命：<strong class="text-blue-600">${sizeCategory.lifespan.min}-${sizeCategory.lifespan.max} 年</strong></li>
+                        </ul>
+                        <hr class="my-4 border-blue-200">
+                        <p class="text-3xl font-extrabold text-center text-blue-700">
+                            相當於人類年齡：<br>
+                            <span class="text-5xl">${ageText}</span>
+                        </p>
+                        ${ageNote}
+                        ${lifespanWarning}
+                    </div>
+                `;
+            }
+        }
+
+        // 在頁面載入完成後，將計算函數綁定到表單提交事件
+        window.onload = function () {
+            document.getElementById('ageForm').addEventListener('submit', calculateHumanAge);
+        };
+    </script>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-lg">
+        <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">🐾 狗狗人類年齡換算器</h1>
+            <p class="text-center text-gray-500 mb-6">根據您的狗狗的體型和年齡進行專業換算。</p>
+
+            <div id="notification" class="hidden p-3 mb-4 rounded-lg font-medium transition-all duration-300"
+                role="alert">
+            </div>
+
+            <form id="ageForm" class="space-y-6">
+                <div>
+                    <label for="birthDate" class="block text-sm font-medium text-gray-700 mb-1">狗狗出生年月日
+                        (YYYY/MM/DD)</label>
+                    <input type="date" id="birthDate" name="birthDate" required
+                        class="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                </div>
+
+                <div>
+                    <label for="weight" class="block text-sm font-medium text-gray-700 mb-1">狗狗體重 (公斤 kg)</label>
+                    <div class="relative">
+                        <input type="number" id="weight" name="weight" required min="0.1" step="0.1"
+                            placeholder="例如：15.5"
+                            class="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 pr-12 transition duration-150">
+                        <span class="absolute right-0 top-0 mt-3 mr-3 text-gray-500 font-semibold">kg</span>
+                    </div>
+                </div>
+
+                <button type="submit"
+                    class="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition duration-300 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-300">
+                    計算人類年齡
+                </button>
+            </form>
+
+            <hr class="my-8 border-gray-200">
+
+            <div id="result" class="min-h-[100px] flex items-center justify-center">
+                <p class="text-lg text-gray-400">請輸入資訊並點擊計算按鈕。</p>
+            </div>
+        </div>
+
+        <!-- 版權聲明 -->
+        <div class="mt-6 text-center">
+            <p
+                class="text-sm font-medium bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 inline-block shadow-lg bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                © 2025 圈圈製作 | Made with ❤️
+            </p>
+        </div>
+    </div>
+
+</body>
+
+</html>
