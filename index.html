@@ -225,8 +225,35 @@
 
         // 在頁面載入完成後，將計算函數綁定到表單提交事件
         window.onload = function () {
-            document.getElementById('ageForm').addEventListener('submit', calculateHumanAge);
-        };
+
+        // 綁定表單提交事件
+        document.getElementById('ageForm').addEventListener('submit', calculateHumanAge);
+
+        // 取得欄位
+        const birthInput = document.getElementById('birthDate');
+        const weightInput = document.getElementById('weight');
+
+        // ---------- 讀取 localStorage ----------
+        const savedBirth = localStorage.getItem('dog_birth');
+        const savedWeight = localStorage.getItem('dog_weight');
+
+        if (savedBirth) birthInput.value = savedBirth;
+        if (savedWeight) weightInput.value = savedWeight;
+
+        // 如果你希望載入後自動計算，可將底下註解打開
+        // if (savedBirth && savedWeight) {
+        //     calculateHumanAge(new Event('submit'));
+        // }
+
+        // ---------- 自動儲存到 localStorage ----------
+        birthInput.addEventListener('change', () => {
+            localStorage.setItem('dog_birth', birthInput.value);
+        });
+
+        weightInput.addEventListener('input', () => {
+            localStorage.setItem('dog_weight', weightInput.value);
+        });
+    };
     </script>
 </head>
 
